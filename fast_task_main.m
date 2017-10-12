@@ -165,7 +165,7 @@ end
 % need to be revised when the eyelink is here.
 if USE_EYELINK
     
-    eyelink_mpa2(data, 'Init');
+    eyelink_main(data, 'Init');
     
     status = Eyelink('Initialize');
     if status
