@@ -148,11 +148,16 @@ if ~practice_mode % if not practice mode, save the data
     out.subject = SID;
     out.session = SessID;
     out.datafile = fname;
+    out.responsefile = fullfile(savedir, ['b_responsedata_sub' SID '_sess' SessID '.mat']);
     out.exp_starttime = datestr(clock, 0); % date-time: timestamp
     out.seed = seed; % date-time: timestamp
     
+    response = cell(41,1); % preallocate the cell structure
+    response{1} = out.seed;
+    
     % save the data
     save(out.datafile, 'out');
+    save(out.responsefile, 'response');
     
 end
 

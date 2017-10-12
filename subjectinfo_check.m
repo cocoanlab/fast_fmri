@@ -47,9 +47,9 @@ SessID = input('Session number? ', 's');
     
 %% Check if the data file exists
 if task
-    fname = fullfile(savedir, ['taskdata_sub' SID '_sess' SessID '.mat']);
+    fname = fullfile(savedir, ['a_taskdata_sub' SID '_sess' SessID '.mat']);
 elseif survey
-    fname = fullfile(savedir, ['surveydata_sub' SID '_sess' SessID '.mat']);
+    fname = fullfile(savedir, ['c_surveydata_sub' SID '_sess' SessID '.mat']);
 else
     error('Unknown input');
 end
