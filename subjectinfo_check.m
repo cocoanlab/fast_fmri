@@ -43,12 +43,13 @@ end
 %% Get subject ID    
 fprintf('\n');
 SID = input('Subject ID (number)? ', 's');
+SessID = input('Session number? ', 's');
     
 %% Check if the data file exists
 if task
-    fname = fullfile(savedir, ['taskdata_s' SID '.mat']);
+    fname = fullfile(savedir, ['taskdata_sub' SID '_sess' SessID '.mat']);
 elseif survey
-    fname = fullfile(savedir, ['surveydata_s' SID '.mat']);
+    fname = fullfile(savedir, ['surveydata_sub' SID '_sess' SessID '.mat']);
 else
     error('Unknown input');
 end
