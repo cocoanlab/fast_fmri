@@ -262,8 +262,10 @@ try
     waitsec_fromstarttime(data.runscan_starttime, 10);
     
     
+    %% MAIN TASK 1. SHOW 2 WORDS, WORD PROMPT
     
     
+    %% MAIN TASK 2. SHOW 2 WORDS, QUESTION PROMPT, EMOTION WORDS, CLICK
     
     
     
