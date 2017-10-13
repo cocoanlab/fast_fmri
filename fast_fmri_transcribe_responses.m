@@ -60,7 +60,7 @@ end
 SID = input('Subject ID (number)? ', 's');
 SessID = input('Session number? ', 's');
 
-dat_file = fullfile(savedir, ['a_taskdata_sub' SID '_sess' SessID '.mat']);
+dat_file = fullfile(savedir, ['a_worddata_sub' SID '_sess' SessID '.mat']);
 save_file = fullfile(savedir, ['b_responsedata_sub' SID '_sess' SessID '.mat']);
 
 load(dat_file); 

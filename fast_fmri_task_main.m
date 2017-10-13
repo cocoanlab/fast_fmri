@@ -1,6 +1,8 @@
-function data = fast_fmri_main(varargin)
+function data = fast_fmri_task_main(ts, varargin)
 
 % 
+% ts{j} = {{'w1', 'w2'}, [6], [0]} -> no rating
+% ts{j} = {{'w1', 'w2'}, [6], [6]} -> rating
 
 
 % Run a survey for the Free ASsociation Task. 
@@ -57,11 +59,9 @@ function data = fast_fmri_main(varargin)
 %    Copyright (C) 2017  Wani Woo (Cocoan lab)
 % ..
 
-response = '';
 testmode = false;
 savedir = fullfile(pwd, 'data');
-psychtoolboxdir = '/Users/clinpsywoo/Documents/MATLAB/Psychtoolbox';
-scriptdir = '/Users/clinpsywoo/Dropbox/W_FAST/script';
+scriptdir = '/Users/clinpsywoo/github/fast_fmri'; % modify this
 
 for i = 1:length(varargin)
     if ischar(varargin{i})
@@ -71,12 +71,15 @@ for i = 1:length(varargin)
                 testmode = true;
             case {'savedir'}
                 savedir = varargin{i+1};
-            case {'psychtoolbox'}
-                psychtoolboxdir = varargin{i+1};
             case {'scriptdir'}
                 scriptdir = varargin{i+1};
-            case {'response'}
-                response = varargin{i+1};
+            case {'eyelink', 'eye', 'eyetrack'}
+                USE_EYELINK = true;
+            case {'biopac'}
+                USE_BIOPAC = true;
+                channel_n = 1;
+                biopac_channel = 0;
+                ljHandle = BIOPAC_setup(channel_n); % BIOPAC SETUP
         end
     end
 end
@@ -89,8 +92,6 @@ global white red orange blue bgcolor response_W; % color
 global fontsize window_rect lb rb tb bb anchor_xl anchor_xr anchor_yu anchor_yd scale_H; % rating scale
 
 %% SETUP: Screen
-
-addpath(genpath(psychtoolboxdir));
 
 bgcolor = 100;
 
@@ -128,69 +129,145 @@ anchor_xr = rb+20; % 916
 anchor_yu = tb-40; % 170
 anchor_yd = bb+20; % 710
 
-% ready for body map
-bodymap = imread('imgs/bodymap_bgcolor.jpg');
-bodymap = bodymap(:,:,1);
-[body_y, body_x] = find(bodymap(:,:,1) == 255);
-
-bodymap([1:10 791:800], :) = [];
-bodymap(:, [1:10 1271:1280]) = []; % make the picture smaller 
-
 %% SETUP: DATA and Subject INFO
 
-[fname, start_line, SID] = subjectinfo_check(savedir, 'survey'); % subfunction
-if exist(fname, 'file'), load(fname, 'data'); end
-
-if isempty(response)
-    dat_file= fullfile(savedir, ['taskdata_s' SID '.mat']);
-    load(dat_file); % load data
-    response = out.response;
-    clear out;
-end
+[fname, start_line, SID, SessID] = subjectinfo_check(savedir, 'task'); % subfunction
+% if exist(fname, 'file'), load(fname, 'data'); end
 
 % save data using the canlab_dataset object
-data.version = 'FAST_survey_v1_05-19-2017';
+data.version = 'FAST_fmri_task_v1_10-13-2017';
+data.github = 'https://github.com/cocoanlab/fast_fmri';
 data.subject = SID;
-data.datafile = fname;
-data.starttime = datestr(clock, 0); % date-time
-data.starttime_getsecs = GetSecs; % in the same format of timestamps for each trial
+data.session = SessID;
+data.wordfile = fullfile(savedir, ['a_worddata_sub' SID '_sess' SessID '.mat']);
+data.responsefile = fullfile(savedir, ['b_responsedata_sub' SID '_sess' SessID '.mat']);
+data.taskfile = fullfile(savedir, ['c_taskdata_sub' SID '_sess' SessID '.mat']);
+data.surveyfile = fullfile(savedir, ['d_surveydata_sub' SID '_sess' SessID '.mat']);
+data.exp_starttime = datestr(clock, 0); % date-time
 
 % initial save of trial sequence
-save(data.datafile, 'response', 'data');
+save(data.taskfile, 'ts', 'data');
 
 
-%% Survey start
+%% SETUP: Eyelink
 
-% try
+% need to be revised when the eyelink is here.
+if USE_EYELINK
+    edf_filename = ['eyelink_sub' SID '_sess' SessID];
+    eyelink_main(edf_filename, 'Init');
+    
+    status = Eyelink('Initialize');
+    if status
+        error('Eyelink is not communicating with PC. Its okay baby.');
+    end
+    Eyelink('Command', 'set_idle_mode');
+    waitsec_fromstarttime(GetSecs, .5);
+end
+
+
+%% TASK START
+
+try
     % START: Screen
     % whichScreen = max(Screen('Screens'));
 	theWindow = Screen('OpenWindow', 0, bgcolor, window_rect); % start the screen
     Screen('Preference','TextEncodingLocale','ko_KR.UTF-8');
-    HideCursor;
     Screen('TextFont', theWindow, font); % setting font
     Screen('TextSize', theWindow, fontsize);
+    HideCursor;
     
-    %% Prompts
     
-    ready_prompt{1}{1} = double('다음에 주어지는 질문에 솔직하게 대답해주세요.');
-    ready_prompt{1}{2} = double('앞 단어와 연결되어 있는 맥락을 고려해서 대답해주시면 됩니다.');
-    ready_prompt{1}{3} = double('준비되셨으면 스페이스바를 눌러주세요.');
+    %% PROMPT SETUP:
+    pre_scan_prompt = double('이번에는 여러분이 방금 말씀하셨던 단어들을 순서대로 보게 될 것입니다.\n각 단어들을 15초 동안 보여드릴텐데 그 시간동안 그 단어들이 여러분에게 어떤 의미로 다가오는지\n자연스럽게 생각해보시기 바랍니다. 이후 여러 개의 감정 단어들 중에서\n여러분이 느끼는 감정과 가장 가까운 단어를 선택하시면 됩니다.\n모두 이해하셨으면 버튼을 클릭해주세요.');
+    exp_start_prompt = double('실험자는 모든 것이 잘 준비되었는지 체크해주세요 (Biopac, Eyelink, 등등).\n모두 준비되었으면, 스페이스바를 눌러주세요.');
+    ready_prompt = double('피험자가 준비되었으면, 이미징을 시작합니다 (s).');
+    run_end_prompt = double('잘하셨습니다. 잠시 대기해 주세요.');
     
-    question_prompt{1}{1} = double('가로축: 단어에서 느껴지는 감정 (부정-긍정)');
-    question_prompt{1}{2} = double('세로축: 나와의 관련성 (관련없음-관련많음)');
-    question_prompt{2}{1} = double('이 단어는 시간적으로 과거-현재-미래의 축에서 어디쯤 위치할까요?');
-    question_prompt{3}{1} = double('이 단어를 생각할 때, 활동이 ''증가''(빨강:r)되거나 ''감소''(파랑:b)되는 몸의 부위가 어디인가요?');
-    question_prompt{3}{2} = double('클릭한 채로 움직이면 색칠이 됩니다. 색칠이 끝나면 n을 눌러주세요.');
+    word_prompt = double('이 단어들이 여러분에게 어떤 의미인지 자연스럽게 생각해보세요.');
+    emo_question_prompt = double('감정 단어들 중에서 이 단어들과 관련하여 여러분이 느끼는 감정과 가장 가까운 단어는 무엇인가요?');
     
-    run_end_prompt = double('잘하셨습니다. 다음 단어 세트를 기다려주세요.');
-    exp_end_prompt = double('설문을 마치셨습니다. 감사합니다!');
+    %% TEST RATING: Test trackball, click using an example trial... 
     
-    % W and H for seed words
-    for i = 1:numel(response)
-        for j = 1:numel(response{i})
-            response_W{i}{j} = Screen(theWindow, 'DrawText', double(response{i}{j}), 0, 0);
+    
+    %% DISPLAY PRESCAN MESSAGE
+    while (1)
+        [~, ~, button] = GetMouse(theWindow);
+        if button(1)
+            break
+        elseif keyCode(KbName('q'))==1
+            abort_man;
         end
+        Screen(theWindow,'FillRect',bgcolor, window_rect);
+        DrawFormattedText(theWindow, pre_scan_prompt, 'center', 'center', white, [], [], [], 1.5);
+        Screen('Flip', theWindow);
     end
+    
+    %% DISPLAY EXP START MESSAGE
+    while (1)
+        [~,~,keyCode] = KbCheck;
+        if keyCode(KbName('space'))==1
+            break
+        elseif keyCode(KbName('q'))==1
+            abort_man;
+        end
+        Screen(theWindow,'FillRect',bgcolor, window_rect);
+        DrawFormattedText(theWindow, exp_start_prompt, 'center', 'center', white, [], [], [], 1.5);
+        Screen('Flip', theWindow);
+    end
+    
+    %% WAITING FOR INPUT FROM THE SCANNER
+    while (1)
+        [~,~,keyCode] = KbCheck;
+        
+        if keyCode(KbName('s'))==1
+            break
+        elseif keyCode(KbName('q'))==1
+            abort_experiment('manual');
+        end
+        
+        Screen(theWindow, 'FillRect', bgcolor, window_rect);
+        DrawFormattedText(theWindow, ready_prompt,'center', textH, white);
+        Screen('Flip', theWindow);
+    end
+    
+    %% FOR DISDAQ 10 SECONDS
+    
+    % gap between 's' key push and the first stimuli (disdaqs: data.disdaq_sec)
+    % 4 seconds: "시작합니다..."
+    data.runscan_starttime = GetSecs; % run start timestamp
+    Screen(theWindow, 'FillRect', bgcolor, window_rect);
+    DrawFormattedText(theWindow, double('시작합니다...'), 'center', 'center', white, [], [], [], 1.2);
+    Screen('Flip', theWindow);
+    waitsec_fromstarttime(data.runscan_starttime, 4);
+    
+    % 4 seconds: Blank
+    Screen(theWindow,'FillRect',bgcolor, window_rect);
+    Screen('Flip', theWindow);
+        
+    %% EYELINK AND BIOPAC SETUP
+    
+    if USE_EYELINK
+        Eyelink('StartRecording');
+        data.eyetracker_starttime = GetSecs; % eyelink timestamp
+    end
+        
+    if USE_BIOPAC
+        data.biopac_starttime = GetSecs; % biopac timestamp
+        BIOPAC_trigger(ljHandle, biopac_channel, 'on');
+        waitsec_fromstarttime(data.biopac_starttime, 1);
+        BIOPAC_trigger(ljHandle, biopac_channel, 'off');
+    end
+    
+    % 10 seconds from the runstart
+    waitsec_fromstarttime(data.runscan_starttime, 10);
+    
+    
+    
+    
+    
+    
+    
+    
     
     %% Main function: show 2-3 response words
     for seeds_i = start_line(1):numel(response) % loop through the seed words
@@ -433,12 +510,14 @@ save(data.datafile, 'response', 'data');
     Screen('CloseAll'); %relinquish screen control
     
     
-% catch err
-%     % ERROR 
-%     disp(err);
-%     disp(err.stack(end));
-%     abort_experiment('error'); 
-% end
+catch err
+    % ERROR 
+    disp(err);
+    for i = 1:numel(err.stack)
+        disp(err.stack(i));
+    end
+    abort_experiment('error');  
+end
 
 end
 
@@ -476,6 +555,8 @@ end
 function display_target_word(seeds_i, target_i, response)
 
 global orange theWindow response_W W;
+
+response_W{i}{j} = Screen(theWindow, 'DrawText', double(response{i}{j}), 0, 0);
 
 interval = 50;
 y_loc = 140;

@@ -1,4 +1,4 @@
-function [fname, start_line, SID] = subjectinfo_check(savedir, varargin)
+function [fname, start_line, SID, SessID] = subjectinfo_check(savedir, varargin)
 
 % Get subject information, and check if the data file exists?
 %
@@ -27,11 +27,14 @@ function [fname, start_line, SID] = subjectinfo_check(savedir, varargin)
 %% SETUP: varargin
 task = false;
 survey = false;
+word = false;
 
 for i = 1:length(varargin)
     if ischar(varargin{i})
         switch varargin{i}
             % functional commands
+            case {'word'}
+                word = true;
             case {'task'}
                 task = true;
             case {'survey'}
@@ -46,10 +49,12 @@ SID = input('Subject ID (number)? ', 's');
 SessID = input('Session number? ', 's');
     
 %% Check if the data file exists
-if task
-    fname = fullfile(savedir, ['a_taskdata_sub' SID '_sess' SessID '.mat']);
+if word
+    fname = fullfile(savedir, ['a_worddata_sub' SID '_sess' SessID '.mat']);
+elseif task
+    fname = fullfile(savedir, ['c_taskdata_sub' SID '_sess' SessID '.mat']);
 elseif survey
-    fname = fullfile(savedir, ['c_surveydata_sub' SID '_sess' SessID '.mat']);
+    fname = fullfile(savedir, ['d_surveydata_sub' SID '_sess' SessID '.mat']);
 else
     error('Unknown input');
 end
@@ -74,7 +79,11 @@ end
     
 %% If we want to start the task from where we left off
 
-if whattodo == 2
+if (whattodo == 2 && task) || (whattodo == 2 && word)
+    
+    error('You need to start from the beginning. Please check the file, and choose 1:Save new file. next time');
+    
+elseif whattodo == 2 && survey
     
     temp = load(fname);
     temp_f = fields(temp);

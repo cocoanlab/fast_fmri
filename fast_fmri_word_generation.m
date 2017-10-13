@@ -138,17 +138,19 @@ orange = [255 164 0];
 
 if ~practice_mode % if not practice mode, save the data
     
-    [fname, ~, SID, SessID] = subjectinfo_check(savedir, 'task'); % subfunction
+    [fname, ~, SID, SessID] = subjectinfo_check(savedir, 'word'); % subfunction
     
     if exist(fname, 'file'), load(fname, 'out'); end
     
     % add some task information
-    out.version = 'FAST_v2_10-12-2017';
+    out.version = 'FAST_fmri_wordgeneration_v1_10-12-2017';
     out.github = 'https://github.com/cocoanlab/fast_fmri';
     out.subject = SID;
     out.session = SessID;
-    out.datafile = fname;
+    out.wordfile = fullfile(savedir, ['a_worddata_sub' SID '_sess' SessID '.mat']);
     out.responsefile = fullfile(savedir, ['b_responsedata_sub' SID '_sess' SessID '.mat']);
+    out.taskfile = fullfile(savedir, ['c_taskdata_sub' SID '_sess' SessID '.mat']);
+    out.surveyfile = fullfile(savedir, ['d_surveydata_sub' SID '_sess' SessID '.mat']);
     out.exp_starttime = datestr(clock, 0); % date-time: timestamp
     out.seed = seed; % date-time: timestamp
     
@@ -156,7 +158,7 @@ if ~practice_mode % if not practice mode, save the data
     response{1} = out.seed;
     
     % save the data
-    save(out.datafile, 'out');
+    save(out.wordfile, 'out');
     save(out.responsefile, 'response');
     
 end
@@ -190,13 +192,15 @@ try
     HideCursor;
     
     %% PROMPT SETUP:
-    ready_prompt = double('피험자가 준비되었으면, 이미징을 시작합니다 (s).');
     exp_start_prompt = double('실험자는 모든 것이 잘 준비되었는지 체크해주세요 (Biopac, Eyelink, 등등).\n모두 준비되었으면, 스페이스바를 눌러주세요.');
+    ready_prompt = double('피험자가 준비되었으면, 이미징을 시작합니다 (s).');
     run_end_prompt = double('잘하셨습니다. 잠시 대기해 주세요.');
     
     if practice_mode
         response_repeat = 5;
     end
+    
+    %% TEST RECORDING... and play
     
     %% DISPLAY EXP START MESSAGE
     while (1)
@@ -327,7 +331,7 @@ try
     % save data
     if ~practice_mode
         out.response{1} = seed;
-        save(out.datafile, 'out');
+        save(out.wordfile, 'out');
     end
     
     %% Close the audio device:
