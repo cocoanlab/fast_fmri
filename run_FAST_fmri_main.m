@@ -19,8 +19,8 @@ fast_fmri_transcribe_responses('nosound') % while running fast_fmri_word_generat
 fast_fmri_transcribe_responses('only_na') % after running fast_fmri_word_generation
 
 %%
-ts = generate_ts;
-fast_fmri_task_main(ts, 'biopac', 'eyelink');
+ts = fast_fmri_generate_ts;
+fast_fmri_task_main(ts, 'biopac', 'eyelink', 'practice');
 
 %% Sess 2
 fast_fmri_word_generation(seeds_rand(2), 'biopac', 'eyelink');

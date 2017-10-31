@@ -62,6 +62,7 @@ function data = fast_fmri_task_main(ts, varargin)
 testmode = false;
 savedir = fullfile(pwd, 'data');
 scriptdir = '/Users/clinpsywoo/github/fast_fmri'; % modify this
+do_practice = false;
 
 for i = 1:length(varargin)
     if ischar(varargin{i})
@@ -80,6 +81,8 @@ for i = 1:length(varargin)
                 channel_n = 1;
                 biopac_channel = 0;
                 ljHandle = BIOPAC_setup(channel_n); % BIOPAC SETUP
+            case {'practice'}
+                do_practice = true;
         end
     end
 end
@@ -88,7 +91,7 @@ cd(scriptdir);
 
 %% SETUP: global
 global theWindow W H; % window property
-global white red orange blue bgcolor response_W; % color
+global white red orange blue bgcolor; % color
 global fontsize window_rect lb rb tb bb anchor_xl anchor_xr anchor_yu anchor_yd scale_H; % rating scale
 
 %% SETUP: Screen
@@ -178,6 +181,7 @@ try
     
     
     %% PROMPT SETUP:
+    practice_prompt = double('연습을 해보겠습니다. 여러 개의 감정 단어들이 나타나면\n트랙볼로 커서를 움직여 아무 단어나 클릭하시면 됩니다.\n준비되셨으면 버튼을 눌러주세요');
     pre_scan_prompt = double('이번에는 여러분이 방금 말씀하셨던 단어들을 순서대로 보게 될 것입니다.\n각 단어들을 15초 동안 보여드릴텐데 그 시간동안 그 단어들이 여러분에게 어떤 의미로 다가오는지\n자연스럽게 생각해보시기 바랍니다. 이후 여러 개의 감정 단어들 중에서\n여러분이 느끼는 감정과 가장 가까운 단어를 선택하시면 됩니다.\n모두 이해하셨으면 버튼을 클릭해주세요.');
     exp_start_prompt = double('실험자는 모든 것이 잘 준비되었는지 체크해주세요 (Biopac, Eyelink, 등등).\n모두 준비되었으면, 스페이스바를 눌러주세요.');
     ready_prompt = double('피험자가 준비되었으면, 이미징을 시작합니다 (s).');
@@ -186,12 +190,38 @@ try
     % word_prompt = double('이 단어들이 여러분에게 어떤 느낌 의미인지 자연스럽게 생각해보세요.');
     % emo_question_prompt = double('감정 단어들 중에서 이 단어들과 관련하여 여러분이 느끼는 감정과 가장 가까운 단어는 무엇인가요?');
     
-    %% TEST RATING: Test trackball, click using an example trial... 
     
+    %% PRACTICE RATING: Test trackball, Practice emotion rating
+    
+    if do_practice
+        while (1)
+            [~, ~, button] = GetMouse(theWindow);
+            [~,~,keyCode] = KbCheck;
+            
+            if button(1)
+                break
+            elseif keyCode(KbName('q'))==1
+                abort_man;
+            end
+            Screen(theWindow,'FillRect',bgcolor, window_rect);
+            DrawFormattedText(theWindow, practice_prompt, 'center', 'center', white, [], [], [], 1.5);
+            Screen('Flip', theWindow);
+        end
+        
+        emotion_rating(GetSecs); % sub-function: 5s
+        
+        % Blank for ITI
+        Screen(theWindow,'FillRect',bgcolor, window_rect);
+        DrawFormattedText(theWindow, run_end_prompt, 'center', 'center', white, [], [], [], 1.5);
+        Screen('Flip', theWindow);
+        WaitSecs(2);
+    end
     
     %% DISPLAY PRESCAN MESSAGE
     while (1)
         [~, ~, button] = GetMouse(theWindow);
+        [~,~,keyCode] = KbCheck;
+        
         if button(1)
             break
         elseif keyCode(KbName('q'))==1
@@ -205,6 +235,7 @@ try
     %% DISPLAY EXP START MESSAGE
     while (1)
         [~,~,keyCode] = KbCheck;
+        
         if keyCode(KbName('space'))==1
             break
         elseif keyCode(KbName('q'))==1
@@ -271,15 +302,18 @@ try
         waitsec_fromstarttime(data.dat{ts_i}.trial_starttime, 15);
         
         % Blank for ISI
+        data.dat{ts_i}.isi_starttime = GetSecs;
         Screen(theWindow,'FillRect',bgcolor, window_rect);
         Screen('Flip', theWindow);
         waitsec_fromstarttime(data.dat{ts_i}.trial_starttime, 15+ts{ts_i}{2});
         
         if ts{ts_i}{3} ~=0
             data.dat{ts_i}.rating_starttime = GetSecs;
-            [data.dat{ts_i}.rating_emotion_word, data.dat{ts_i}.rating_trajectory] = emotion_rating; % sub-function: 5s
+            [data.dat{ts_i}.rating_emotion_word, data.dat{ts_i}.rating_trajectory_time, ...
+                data.dat{ts_i}.rating_trajectory] = emotion_rating(data.dat{ts_i}.rating_starttime); % sub-function: 5s
             
             % Blank for ITI
+            data.dat{ts_i}.iti_starttime = GetSecs;
             Screen(theWindow,'FillRect',bgcolor, window_rect);
             Screen('Flip', theWindow);
             waitsec_fromstarttime(data.dat{ts_i}.trial_starttime, 15+ts{ts_i}{2}+5+ts{ts_i}{3});
@@ -293,6 +327,8 @@ try
     
     %% DISPLAY POSTSCAN MESSAGE
     while (1)
+        [~,~,keyCode] = KbCheck;
+        
         if keyCode(KbName('n'))==1
             break
         elseif keyCode(KbName('q'))==1
@@ -343,7 +379,6 @@ for i = 1:length(varargin)
     end
 end
 
-
 ShowCursor; %unhide mouse
 Screen('CloseAll'); %relinquish screen control
 disp(str); %present this text in command window
@@ -355,7 +390,7 @@ end
 
 function display_target_word(words)
 
-global W H white
+global W H white theWindow window_rect bgcolor
 
 Screen('TextSize', theWindow, 30);
 [response_W(1), response_H(1)] = Screen(theWindow, 'DrawText', words{1}, 0, 0);
@@ -363,7 +398,7 @@ Screen('TextSize', theWindow, 30);
 Screen('TextSize', theWindow, 50);
 [response_W(2), response_H(2)] = Screen(theWindow, 'DrawText', words{2}, 0, 0);
 
-interval = 200;
+interval = 100;
 
 x(1) = W/2 - interval/2 - response_W(1);
 x(2) = W/2 + interval/2;
@@ -383,6 +418,97 @@ Screen('Flip', theWindow);
 
 end
 
-function [emotion_word, trajectory] = emotion_rating
+function [emotion_word, trajectory_time, trajectory] = emotion_rating(starttime)
+
+global orange bgcolor window_rect theWindow red
+
+rng('shuffle');
+rand_z = randperm(14); % random seed
+[choice, xy_rect] = display_emotion_words(rand_z);
+
+SetMouse(W/2, H/2);
+
+trajectory = [];
+trajectory_time = [];
+
+j = 0;
+while(1)
+    j = j + 1;
+    [x, y, button] = GetMouse(theWindow);
+    
+    Screen(theWindow,'FillRect',bgcolor, window_rect);
+    display_emotion_words(rand_z);
+    Screen('DrawDots', theWindow, [x;y], 10, orange, [0 0], 1);
+    Screen('Flip', theWindow);
+    
+    trajectory(j,:) = [x y];
+    trajectory_time(j) = GetSecs - starttime;
+    
+    if trajectory_time(end) >= 5
+        button(1) = true;
+    end
+    
+    if button(1)
+        Screen(theWindow,'FillRect',bgcolor, window_rect);
+        display_emotion_words(rand_z);
+        Screen('DrawDots', theWindow, [x;y], 10, red, [0 0], 1);
+        Screen('Flip', theWindow);
+        
+        % which word based on x y from mouse click
+        choice_idx = x > xy_rect(:,1) & x < xy_rect(:,3) & y > xy_rect(:,2) & y < xy_rect(:,4);
+        if any(choice_idx)
+            emotion_word = choice{choice_idx};
+        else
+            emotion_word = '';
+        end
+        
+        WaitSecs(.3);
+        
+        break;
+    end
+end
+
+end
+
+function [choice, xy_rect] = display_emotion_words(z)
+
+global W H white theWindow window_rect bgcolor square
+
+square = [0 0 130 60];
+r=350;
+t=360/28;
+theta=[t, t*3, t*5, t*7, t*9, t*11, t*13, t*15, t*17, t*19, t*21, t*23, t*25, t*27];
+xy=[W/2+r*cosd(theta(1)) H/2-r*sind(theta(1)); W/2+r*cosd(theta(2)) H/2-r*sind(theta(2)); ...
+    W/2+r*cosd(theta(3)) H/2-r*sind(theta(3)); W/2+r*cosd(theta(4)) H/2-r*sind(theta(4));...
+    W/2+r*cosd(theta(5)) H/2-r*sind(theta(5)); W/2+r*cosd(theta(6)) H/2-r*sind(theta(6));...
+    W/2+r*cosd(theta(7)) H/2-r*sind(theta(7)); W/2+r*cosd(theta(8)) H/2-r*sind(theta(8));...
+    W/2+r*cosd(theta(9)) H/2-r*sind(theta(9)); W/2+r*cosd(theta(10)) H/2-r*sind(theta(10));...
+    W/2+r*cosd(theta(11)) H/2-r*sind(theta(11)); W/2+r*cosd(theta(12)) H/2-r*sind(theta(12));...
+    W/2+r*cosd(theta(13)) H/2-r*sind(theta(13)); W/2+r*cosd(theta(14)) H/2-r*sind(theta(14))];
+
+xy_word = [xy(:,1)-square(3)/2, xy(:,2)-square(4)/2-15, xy(:,1)+square(3)/2, xy(:,2)+square(4)/2];
+xy_rect = [xy(:,1)-square(3)/2, xy(:,2)-square(4)/2, xy(:,1)+square(3)/2, xy(:,2)+square(4)/2];
+
+colors = 200;
+
+%% words
+
+choice = {'기쁨', '괴로움', '희망', '두려움', '만족', '실망', '자부심', '부끄러움', '후회', '감사', '분노', '사랑', '미움', '없음'};
+choice = choice(z);
+
+%%
+SetMouse(W/2, H/2); % set mouse at the center
+
+Screen(theWindow,'FillRect',bgcolor, window_rect);
+
+for i = 1:numel(theta)
+    Screen('FrameRect', theWindow, colors, CenterRectOnPoint(square,xy(i,1),xy(i,2)),3);
+end
+
+for i = 1:numel(choice)
+%     DrawFormattedText(theWindow, double(choice{i}), 'center', 'center', white, [],[],[],[],[],...
+%         [xy(i,1)-square(3)/2, xy(i,2)-square(4)/2-15, xy(i,1)+square(3)/2, xy(i,2)+square(4)/2]);
+    DrawFormattedText(theWindow, double(choice{i}), 'center', 'center', white, [],[],[],[],[],xy_word(i,:));
+end
 
 end
