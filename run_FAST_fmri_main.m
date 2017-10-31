@@ -12,8 +12,15 @@ seeds_rand = seeds(randperm(numel(seeds)));
 InitializePsychSound;
 
 %% Sess 1
-fast_fmri_word_generation(seeds_rand(1), 'biopac', 'eyelink');
-fast_fmri_task_main(response, 'biopac', 'eyelink');
+fast_fmri_word_generation(seeds_rand{1}, 'biopac', 'eyelink');
+
+%% 
+fast_fmri_transcribe_responses('nosound') % while running fast_fmri_word_generation
+fast_fmri_transcribe_responses('only_na') % after running fast_fmri_word_generation
+
+%%
+ts = generate_ts;
+fast_fmri_task_main(ts, 'biopac', 'eyelink');
 
 %% Sess 2
 fast_fmri_word_generation(seeds_rand(2), 'biopac', 'eyelink');

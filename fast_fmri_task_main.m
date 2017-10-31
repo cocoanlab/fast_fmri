@@ -183,8 +183,8 @@ try
     ready_prompt = double('피험자가 준비되었으면, 이미징을 시작합니다 (s).');
     run_end_prompt = double('잘하셨습니다. 잠시 대기해 주세요.');
     
-    word_prompt = double('이 단어들이 여러분에게 어떤 의미인지 자연스럽게 생각해보세요.');
-    emo_question_prompt = double('감정 단어들 중에서 이 단어들과 관련하여 여러분이 느끼는 감정과 가장 가까운 단어는 무엇인가요?');
+    % word_prompt = double('이 단어들이 여러분에게 어떤 느낌 의미인지 자연스럽게 생각해보세요.');
+    % emo_question_prompt = double('감정 단어들 중에서 이 단어들과 관련하여 여러분이 느끼는 감정과 가장 가까운 단어는 무엇인가요?');
     
     %% TEST RATING: Test trackball, click using an example trial... 
     
@@ -240,7 +240,7 @@ try
     Screen('Flip', theWindow);
     waitsec_fromstarttime(data.runscan_starttime, 4);
     
-    % 4 seconds: Blank
+    % Blank
     Screen(theWindow,'FillRect',bgcolor, window_rect);
     Screen('Flip', theWindow);
         
@@ -264,253 +264,49 @@ try
     
     %% MAIN TASK 1. SHOW 2 WORDS, WORD PROMPT
     
-    
-    %% MAIN TASK 2. SHOW 2 WORDS, QUESTION PROMPT, EMOTION WORDS, CLICK
-    
-    
-    
-    
-    
-    %% Main function: show 2-3 response words
-    for seeds_i = start_line(1):numel(response) % loop through the seed words
+    for ts_i = 1:numel(ts)
         
-        % Get ready message: waiting for a space bar
-        while (1)
-            [~,~,keyCode] = KbCheck;
-            if keyCode(KbName('space'))==1
-                break;
-            elseif keyCode(KbName('q'))==1
-                abort_experiment('manual');
-            end
-            Screen(theWindow, 'FillRect', bgcolor, window_rect);
-            for i = 1:numel(ready_prompt{1})
-                DrawFormattedText(theWindow, ready_prompt{1}{i},'center', H/2-40*(2-i), white);
-            end
+        data.dat{ts_i}.trial_starttime = GetSecs;
+        display_target_word(ts{ts_i}{1}); % sub-function
+        waitsec_fromstarttime(data.dat{ts_i}.trial_starttime, 15);
+        
+        % Blank for ISI
+        Screen(theWindow,'FillRect',bgcolor, window_rect);
+        Screen('Flip', theWindow);
+        waitsec_fromstarttime(data.dat{ts_i}.trial_starttime, 15+ts{ts_i}{2});
+        
+        if ts{ts_i}{3} ~=0
+            data.dat{ts_i}.rating_starttime = GetSecs;
+            [data.dat{ts_i}.rating_emotion_word, data.dat{ts_i}.rating_trajectory] = emotion_rating; % sub-function: 5s
+            
+            % Blank for ITI
+            Screen(theWindow,'FillRect',bgcolor, window_rect);
             Screen('Flip', theWindow);
+            waitsec_fromstarttime(data.dat{ts_i}.trial_starttime, 15+ts{ts_i}{2}+5+ts{ts_i}{3});
         end
         
-        for target_i = 1:numel(response{seeds_i}) % loop through the response words
-            
-            %% FIRST question: valence, self-relevance
-            rec_i = 0;
-            data.dat{seeds_i}{target_i}.val_self_trajectory = [];
-            data.dat{seeds_i}{target_i}.val_self_timing = [];
-            
-            SetMouse((rb+lb)/2, bb); % set mouse at the center
-            start_t = GetSecs;
-            data.dat{seeds_i}{target_i}.start_time = start_t;
-            
-            while(1)
-                % draw scale:
-                draw_scale_170519('valance_selfrelevance');
-                
-                % display target word and previous words
-                display_target_word(seeds_i, target_i, response);
-                
-                % instruction:
-                Screen('TextSize', theWindow, 23);
-                DrawFormattedText(theWindow,question_prompt{1}{1},'center',40, white);
-                DrawFormattedText(theWindow,question_prompt{1}{2},'center',70, white);
-                Screen('TextSize', theWindow, fontsize);
-                
-                % Track Mouse coordinate
-                [x, y, button] = GetMouse(theWindow);
-                
-                if x < lb, x = lb;
-                elseif x > rb, x = rb;
-                end
-                
-                if y < tb, y = tb;
-                elseif y > bb, y = bb;
-                end
-                
-                % Get trajectory
-                rec_i = rec_i+1; % the number of recordings
-                data.dat{seeds_i}{target_i}.val_self_trajectory(rec_i,:) = vs_converter([x y], 'xy_to_ratings');
-                data.dat{seeds_i}{target_i}.val_self_timing(rec_i,1) = GetSecs - start_t;
-                
-                % draw a line between the current location and the previous rating
-                if target_i > 1 
-                    xy1 = vs_converter(data.dat{seeds_i}{target_i-1}.val_self_rating, 'ratings_to_xy')';
-                    Screen('DrawDots', theWindow, xy1, 7, 220, [0 0], 1);
-                    Screen('DrawLines', theWindow, [xy1 [x;y]], 1.5, 220);
-                end
-                
-                % draw a line between the previous rating and the previous^2 rating
-                if target_i > 2
-                    xy2 = vs_converter(data.dat{seeds_i}{target_i-2}.val_self_rating, 'ratings_to_xy')';
-                    Screen('DrawDots', theWindow, xy2, 7, 120, [0 0], 1);
-                    Screen('DrawLines', theWindow, [xy2 xy1], 1.5, 120);
-                end
-                
-                Screen('DrawDots', theWindow, [x;y], 9, orange, [0 0], 1);
-                Screen('Flip', theWindow);
-                
-                if button(1)
-                    data.dat{seeds_i}{target_i}.val_self_rating = vs_converter([x y], 'xy_to_ratings');
-                    data.dat{seeds_i}{target_i}.val_self_RT = data.dat{seeds_i}{target_i}.val_self_timing(end) - data.dat{seeds_i}{target_i}.val_self_timing(1);
-                    WaitSecs(.2);
-                    break;
-                end
-            end
-            
-            %% SECOND question: time
-            rec_i = 0;
-            SetMouse(W/2, H/2); % set mouse at the center
-            
-            data.dat{seeds_i}{target_i}.time_trajectory = [];
-            data.dat{seeds_i}{target_i}.time_timing = [];
-            start_t = GetSecs;
-
-            while(1)
-                % draw scale:
-                draw_scale_170519('time');
-                
-                % display target word and previous words
-                display_target_word(seeds_i, target_i, response);
-                
-                % insturction
-                Screen('TextSize', theWindow, 23);
-                DrawFormattedText(theWindow,question_prompt{2}{1},'center', 70, white);
-                Screen('TextSize', theWindow, fontsize);
-                
-                % Track Mouse coordinate
-                [x, ~, button] = GetMouse(theWindow);
-                
-                if x < lb, x = lb;
-                elseif x > rb, x = rb;
-                end
-                
-                % Get trajectory
-                rec_i = rec_i+1; % the number of recordings
-                data.dat{seeds_i}{target_i}.time_trajectory(rec_i,1) = ((x-lb)./(rb-lb))*2-1;
-                data.dat{seeds_i}{target_i}.time_timing(rec_i,1) = GetSecs - start_t;
-                
-                xy = [x; bb];
-                Screen('DrawDots', theWindow, xy, 11, orange);
-                Screen('Flip', theWindow);
-                
-                if button(1)
-                    data.dat{seeds_i}{target_i}.time_rating = ((x-lb)./(rb-lb))*2-1;
-                    data.dat{seeds_i}{target_i}.time_RT = data.dat{seeds_i}{target_i}.time_timing(end) - data.dat{seeds_i}{target_i}.time_timing(1);
-                    
-                    draw_scale_170519('time');
-                    display_target_word(seeds_i, target_i, response);
-                    Screen('TextSize', theWindow, 23);
-                    DrawFormattedText(theWindow,question_prompt{2}{1},'center', 70, white);
-                    Screen('TextSize', theWindow, fontsize);
-                    Screen('DrawDots', theWindow, xy, 11, red);
-                    Screen('Flip', theWindow);
-                    
-                    WaitSecs(.5);
-                    break;
-                end
-            
-            end
-            
-            %% THIRD question: body map - activate and deactivate
-            rec_i = 0;
-%             keyCode(keyCode==1) = 0; % init the keyCode
-            SetMouse(W/2, H/2); % set mouse at the center
-            
-            data.dat{seeds_i}{target_i}.body_trajectory = [];
-            data.dat{seeds_i}{target_i}.body_timing = [];
-            data.dat{seeds_i}{target_i}.body_rating_red = [];
-            data.dat{seeds_i}{target_i}.body_rating_blue = [];
-            
-            start_t = GetSecs;
-            
-            % default
-            color = red;
-            color_code = 1;
-            
-            while(1)
-                % draw scale:
-                Screen(theWindow, 'FillRect', bgcolor, window_rect); % reset
-                Screen('PutImage', theWindow, bodymap); % put bodymap image on screen
-                
-                % display target word and previous words
-                display_target_word(seeds_i, target_i, response);
-                
-                % insturction
-                Screen('TextSize', theWindow, 23);
-                DrawFormattedText(theWindow, question_prompt{3}{1},'center', 40, white);
-                DrawFormattedText(theWindow, question_prompt{3}{2},'center', 70, white);
-                Screen('TextSize', theWindow, fontsize);
-                
-                % Track Mouse coordinate
-                [x, y, button] = GetMouse(theWindow);
-                [~,~,keyCode] = KbCheck;
-                
-                if keyCode(KbName('r'))==1
-                    color = red;
-                    color_code = 1;
-                    keyCode(KbName('r')) = 0;
-                elseif keyCode(KbName('b'))==1
-                    color = blue;
-                    color_code = 2;
-                    keyCode(KbName('b')) = 0;
-                end
-                
-                % Get trajectory
-                rec_i = rec_i+1; % the number of recordings
-                data.dat{seeds_i}{target_i}.body_trajectory(rec_i,:) = [x y color_code button(1)];
-                data.dat{seeds_i}{target_i}.body_timing(rec_i,1) = GetSecs - start_t;
-                
-                % current location
-                Screen('DrawDots', theWindow, [x;y], 8, color, [0 0], 1);
-                
-                % color the previous clicked regions
-                if ~isempty(data.dat{seeds_i}{target_i}.body_rating_red)
-                    Screen('DrawDots', theWindow, data.dat{seeds_i}{target_i}.body_rating_red', 8, red, [0 0], 1);
-                end
-                
-                if ~isempty(data.dat{seeds_i}{target_i}.body_rating_blue)
-                    Screen('DrawDots', theWindow, data.dat{seeds_i}{target_i}.body_rating_blue', 8, blue, [0 0], 1);
-                end
-
-                Screen('Flip', theWindow);
-                
-                if button(1) && color_code == 1
-                    data.dat{seeds_i}{target_i}.body_rating_red = [data.dat{seeds_i}{target_i}.body_rating_red; [x y]];
-                elseif button(1) && color_code == 2
-                    data.dat{seeds_i}{target_i}.body_rating_blue = [data.dat{seeds_i}{target_i}.body_rating_blue; [x y]];     
-                end
-                
-                if keyCode(KbName('n'))==1
-                    data.dat{seeds_i}{target_i}.body_RT = data.dat{seeds_i}{target_i}.body_timing(end) - data.dat{seeds_i}{target_i}.body_timing(1);
-                    Screen(theWindow, 'FillRect', bgcolor, window_rect);
-                    Screen('Flip', theWindow);
-                    WaitSecs(.5);
-                    break; 
-                end
-            end
-            
+        if mod(ts_i, 2) == 0
+            save(data.taskfile, 'data', '-append');
         end
-        
-        %% Run End
-        if seeds_i < numel(response)
-            Screen(theWindow, 'FillRect', bgcolor, window_rect);
-            DrawFormattedText(theWindow, run_end_prompt, 'center', textH, white);
-            Screen('Flip', theWindow);
-        end
-        
-        % save data
-        save(fname, 'data')
-        WaitSecs(1.0);
         
     end
     
-    %% Experiment end message
+    %% DISPLAY POSTSCAN MESSAGE
+    while (1)
+        if keyCode(KbName('n'))==1
+            break
+        elseif keyCode(KbName('q'))==1
+            abort_man;
+        end
+        Screen(theWindow,'FillRect',bgcolor, window_rect);
+        DrawFormattedText(theWindow, run_end_prompt, 'center', 'center', white, [], [], [], 1.5);
+        Screen('Flip', theWindow);
+    end
     
-    Screen(theWindow, 'FillRect', bgcolor, window_rect);
-    DrawFormattedText(theWindow, exp_end_prompt, 'center', textH, white);
-    Screen('Flip', theWindow);
-    WaitSecs(2);
+    save(data.taskfile, 'data', '-append');
     
     ShowCursor; %unhide mouse
-    Screen('CloseAll'); %relinquish screen control
-    
+    Screen('CloseAll'); %relinquish screen control 
     
 catch err
     % ERROR 
@@ -554,56 +350,39 @@ disp(str); %present this text in command window
 
 end
 
-function display_target_word(seeds_i, target_i, response)
 
-global orange theWindow response_W W;
+%% ========================== SUB-FUNCTIONS ===============================
 
-response_W{i}{j} = Screen(theWindow, 'DrawText', double(response{i}{j}), 0, 0);
+function display_target_word(words)
 
-interval = 50;
-y_loc = 140;
+global W H white
 
-% ==== DISPLAY 2-3 RESPONSE WORDS ====
+Screen('TextSize', theWindow, 30);
+[response_W(1), response_H(1)] = Screen(theWindow, 'DrawText', words{1}, 0, 0);
 
-% 1. target word
-target_loc = W/2-response_W{seeds_i}{target_i}/2;
-Screen('DrawText', theWindow, double(response{seeds_i}{target_i}), target_loc, y_loc, orange);
+Screen('TextSize', theWindow, 50);
+[response_W(2), response_H(2)] = Screen(theWindow, 'DrawText', words{2}, 0, 0);
 
-% 2. Previous word
-if target_i > 1
-    pre_target_loc = target_loc-interval-response_W{seeds_i}{target_i-1};
-    Screen('DrawText', theWindow, double(response{seeds_i}{target_i-1}), pre_target_loc, y_loc, 180);
+interval = 200;
+
+x(1) = W/2 - interval/2 - response_W(1);
+x(2) = W/2 + interval/2;
+
+y(1) = H/2 - response_H(1);
+y(2) = H/2 - response_H(2);
+
+Screen(theWindow,'FillRect',bgcolor, window_rect);
+
+Screen('TextSize', theWindow, 30);
+DrawFormattedText(theWindow, words{1}, x(1), y(1), white, [], [], [], 1.5);
+
+Screen('TextSize', theWindow, 50);
+DrawFormattedText(theWindow, words{2}, x(2), y(2), white, [], [], [], 1.5);
+
+Screen('Flip', theWindow);
+
 end
 
-% 3. Pre-Previous word
-if target_i > 2
-    pre_pre_target_loc = pre_target_loc-interval-response_W{seeds_i}{target_i-2};
-    Screen('DrawText', theWindow, double(response{seeds_i}{target_i-2}), pre_pre_target_loc, y_loc, 130);
-end
+function [emotion_word, trajectory] = emotion_rating
 
 end
-
-function xy = vs_converter(xy, type)
-
-global lb rb bb tb;
-% xy: x - xy(:,1), y - xy(:,2)
-% type = 1: x, y coordinate to ratings 
-% type = 2: ratings to x, y coordinate
-
-x = xy(:,1);
-y = xy(:,2);
-
-switch type
-    
-    case {'xy_to_ratings'}
-        x = (x-lb)./(rb-lb).*2-1;
-        y = (y-tb)./(bb-tb);
-    case {'ratings_to_xy'}
-        x = (x+1).*(rb-lb)./2+lb;
-        y = y.*(bb-tb)+tb;
-end
-
-xy = [x y];
-    
-end
-
